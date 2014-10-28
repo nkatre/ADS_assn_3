@@ -42,29 +42,36 @@ typedef struct{
 }super_fo;
 
 
-
 inputBufferStruct *ptr = NULL;
 sub_fo *small_fo=NULL;
 super_fo *big_fo = NULL;
 
 int totalSortedFiles=0;
 int inputBuffer[1000]={0};
-int max_inputBufferSize=1000;  //change
 int outputBuffer[1000]={0};
+int max_inputBufferSize=1000;  //change
 int max_outputBufferSize=1000;  //change
+
+
 int act_outputBufferSize=0;
 int act_inputBufferSize=0;
-int mergeType=0;// mergeType
+int mergeType=0;  //mergeType
 
 
 int totalBytes=0;
 int totalInts = 0;
 
-sub_fo* garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mergeType);
+void garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mergeType);
 inputBufferStruct* resizeArray(inputBufferStruct *ptr, int counter,int size, char file[]);
 inputBufferStruct* readValues(inputBufferStruct *ptr, int counter, int size);
 void fileInput(int start, int end, int maxPossible, sub_fo *small_fo);
 void printPtr(inputBufferStruct *ptr, int total);
+void writeSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]);
+int findMinElementSequentialSearch(inputBufferStruct *ptr, int size);
+int checkOverflow(inputBufferStruct *ptr, int counter);
+inputBufferStruct* readNewInputsFromFile(inputBufferStruct *ptr, int counter);
+sub_fo* modify_small_fo_Values(sub_fo *small_fo,int counter, int diff);
+void readOutputFile(char file[]);
 
 sub_fo* register_sub_fo(sub_fo *small_fo, int counter, char file[], int offset, int total, int left){
 	if(small_fo==NULL){
@@ -229,22 +236,30 @@ int main(int argc, char *argv[]){
     inputReader=NULL;
 
     createSortedRuns(0,totalInts,argv[2]);
+    printf("************Before File Input Call - Small FO******************");
     print(small_fo);
-
 
     // get max possible input from each file
     int maxPossible = max_inputBufferSize/totalSortedFiles;
     fileInput(0,totalSortedFiles,maxPossible,small_fo);
-
+    printf("************After File Input Call - Small FO******************");
+      print(small_fo);
+    printf("************After File Input Call - Pointer******************");
     printPtr(ptr,totalSortedFiles);
 
-    small_fo = garbageCollector(small_fo,ptr,(totalSortedFiles), mergeType);
+    writeSortedRuns(0,totalInts,ptr,argv[3]);
+    /*printf("************Small FO******************");
+    print(small_fo);
+    printf("************Pointer******************");
+    printPtr(ptr,totalSortedFiles); */
+    readOutputFile(argv[3]);
+    garbageCollector(small_fo,ptr,(totalSortedFiles), mergeType);
 
 	}
 	return 0;
 }
 
-sub_fo* garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mergeType){
+void garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mergeType){
 
 	if(mergeType == 1){   // --basic
     free(small_fo);
@@ -252,7 +267,6 @@ sub_fo* garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int 
     free(ptr);
     ptr=NULL;
 	}
-	return small_fo;
 }
 
 inputBufferStruct* resizeArray(inputBufferStruct *ptr, int counter,int size, char file[]){
@@ -284,15 +298,22 @@ inputBufferStruct* readValues(inputBufferStruct *ptr, int counter, int size){
 		FILE *tempInputFile = NULL;
 		tempInputFile=fopen(ptr[counter].filename,"r+b");
 		rewind(tempInputFile);
+		int offset = (small_fo[counter].offset) * sizeof(int);
+		fseek(tempInputFile,offset,SEEK_SET);
 		int i=0;
 		for(i=0;i<size;i++){
 			fseek(tempInputFile,0,SEEK_CUR);
 			fread(&ptr[counter].integers[i],sizeof(int),1,tempInputFile);
+			//offset += sizeof(int);
 		}
+		ptr[counter].int_size=size;
+		ptr[counter].available=1;
+		ptr[counter].int_start=0;
 		//garbage collection
 		fclose(tempInputFile);
 		tempInputFile=NULL;
 	}
+
 	return ptr;
 }
 void fileInput(int start, int end, int maxPossible, sub_fo *small_fo){   // we know that the total size of small_fo = totalSortedFiles = ptr size
@@ -307,13 +328,14 @@ void fileInput(int start, int end, int maxPossible, sub_fo *small_fo){   // we k
 		else if(maxPossible>small_fo[i].left){
 			ptr = resizeArray(ptr,i,small_fo[i].left,small_fo[i].filename);
 			ptr = readValues(ptr,i,small_fo[i].left);
-			small_fo[i].offset = small_fo[i].total;
+			small_fo[i].offset += small_fo[i].left;
 			small_fo[i].left = 0;
 		}
 		if(small_fo[i].left==0){             // TODO : Should I remove this condition
 			small_fo[i].available=0;
 		}
 	}
+
 }
 
 void printPtr(inputBufferStruct *ptr, int total){
@@ -325,6 +347,126 @@ void printPtr(inputBufferStruct *ptr, int total){
 		printf("Associated file name is: %s\n",ptr[i].filename);
 		for(j=0;j<ptr[i].int_size;j++)
 		printf("Elements of the integer are: %i\n",ptr[i].integers[j]);
+		printf("Available: %i\n",ptr[i].available);
+	}
+}
+void writeSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]){
+
+	FILE *outFile = NULL;
+	//printf("%s\n",file);
+    outFile=fopen(file,"w+b");
+	rewind(outFile);
+	int i=0;
+	int offset_OB = 0;
+
+	for(i=start;i<end;i++){
+		int minElement = findMinElementSequentialSearch(ptr,totalSortedFiles);
+		outputBuffer[act_outputBufferSize] = minElement;
+		act_outputBufferSize++;
+
+		if((act_outputBufferSize==max_outputBufferSize) ||(i==(end-1))){
+
+            fseek(outFile,offset_OB,SEEK_SET);
+            fwrite(&outputBuffer,sizeof(int),act_outputBufferSize,outFile);
+            offset_OB +=act_outputBufferSize * sizeof(int);
+            // garbage Collection
+            int j=0;
+            for(j=0;j<max_outputBufferSize;j++){
+            	outputBuffer[j]=0;
+            }
+            act_outputBufferSize=0;
+
+
+            /*printf("************Small FO******************Counter: %i\n");
+            print(small_fo);
+            printf("************Pointer******************Counter: %i\n");
+            printPtr(ptr,totalSortedFiles);*/
+
+		}
+	}
+	fclose(outFile);
+	outFile=NULL;
+}
+
+int findMinElementSequentialSearch(inputBufferStruct *ptr, int size){
+
+	int minElement = INT_MAX;
+	int minElementStructIndex = 0;
+    int i=0;
+    for(i=0;i<size;i++){
+    	int startIndex = ptr[i].int_start;
+    	if((ptr[i].integers[startIndex]<=minElement) && (ptr[i].available==1) && (checkOverflow(ptr,i)==0)){
+    		minElement=ptr[i].integers[startIndex];
+    		minElementStructIndex = i;
+    	}
+    }
+    ptr[minElementStructIndex].int_start++; // mark the minElement in the Struct as VISITED
+    int result = checkOverflow(ptr,minElementStructIndex); // Check for Overflow
+    if(result==1){   // read the next set of integers and return min
+    	ptr = readNewInputsFromFile(ptr,minElementStructIndex);
+    }
+    return minElement;
+}
+int checkOverflow(inputBufferStruct *ptr, int counter){
+	if(ptr[counter].int_start == ptr[counter].int_size)
+		return 1;
+	else
+		return 0;
+}
+inputBufferStruct* readNewInputsFromFile(inputBufferStruct *ptr, int counter){
+
+    	int noOfIntegersLeftToBeRead = small_fo[counter].left;
+
+    	if(noOfIntegersLeftToBeRead >= ptr[counter].int_size){
+    		ptr = readValues(ptr,counter,ptr[counter].int_size);
+    		// modify small_fo Values
+            small_fo = modify_small_fo_Values(small_fo,counter,ptr[counter].int_size);
+    	}
+
+    	else
+    		{
+    		if(noOfIntegersLeftToBeRead == 0)
+    		ptr[counter].available = 0;
+    	    else{
+    	    	if(noOfIntegersLeftToBeRead < ptr[counter].int_size)
+    	    	{
+    		   ptr = readValues(ptr,counter,noOfIntegersLeftToBeRead);
+    		    // modify small_fo Values
+    		   small_fo = modify_small_fo_Values(small_fo,counter,noOfIntegersLeftToBeRead);
+    	    	}
+    	     }
+    	}
+    return ptr;
+}
+sub_fo* modify_small_fo_Values(sub_fo *small_fo,int counter, int diff){
+	small_fo[counter].left -= diff;
+	small_fo[counter].offset +=diff;
+	if(small_fo[counter].left==0){      // TODO: This can be <= instead of ==
+		small_fo[counter].available=0;
 	}
 
+	return small_fo;
+}
+void readOutputFile(char file[]){
+     FILE *OFReader=NULL;
+     OFReader = fopen(file,"r+b");
+     rewind(OFReader);
+     fseek(OFReader,0,SEEK_END);
+     int totalB = ftell(OFReader);
+     int totalI = totalB/sizeof(int);
+     rewind(OFReader);
+     int *outputInt = (int *)malloc(sizeof(int)*totalI);
+     int i=0;
+     int offset = 0;
+     for(i=0;i<totalI;i++){
+    	 fseek(OFReader,offset,SEEK_SET);
+    	 fread(&outputInt[i],sizeof(int),1,OFReader);
+    	 printf("%i\n",outputInt[i]);
+    	 offset += sizeof(int);
+     }
+     fclose(OFReader);
+     OFReader=NULL;
+
+     free(outputInt);
+     outputInt=NULL;
 }
