@@ -60,10 +60,11 @@ int mergeType=0;// mergeType
 int totalBytes=0;
 int totalInts = 0;
 
-sub_fo* garbageCollector(sub_fo *small_fo, int size, int mergeType);
+sub_fo* garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mergeType);
 inputBufferStruct* resizeArray(inputBufferStruct *ptr, int counter,int size, char file[]);
 inputBufferStruct* readValues(inputBufferStruct *ptr, int counter, int size);
-
+void fileInput(int start, int end, int maxPossible, sub_fo *small_fo);
+void printPtr(inputBufferStruct *ptr, int total);
 
 sub_fo* register_sub_fo(sub_fo *small_fo, int counter, char file[], int offset, int total, int left){
 	if(small_fo==NULL){
@@ -229,20 +230,31 @@ int main(int argc, char *argv[]){
 
     createSortedRuns(0,totalInts,argv[2]);
     print(small_fo);
-    small_fo = garbageCollector(small_fo,(totalSortedFiles), mergeType);
-    printf("%i\n",totalSortedFiles);
+
+
+    // get max possible input from each file
+    int maxPossible = max_inputBufferSize/totalSortedFiles;
+    fileInput(0,totalSortedFiles,maxPossible,small_fo);
+
+    printPtr(ptr,totalSortedFiles);
+
+    small_fo = garbageCollector(small_fo,ptr,(totalSortedFiles), mergeType);
+
 	}
 	return 0;
 }
 
-sub_fo* garbageCollector(sub_fo *small_fo, int size, int mergeType){
+sub_fo* garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mergeType){
 
 	if(mergeType == 1){   // --basic
     free(small_fo);
     small_fo=NULL;
+    free(ptr);
+    ptr=NULL;
 	}
 	return small_fo;
 }
+
 inputBufferStruct* resizeArray(inputBufferStruct *ptr, int counter,int size, char file[]){
 	if(ptr==NULL){
 		ptr = (inputBufferStruct *)malloc(sizeof(inputBufferStruct));
@@ -282,4 +294,37 @@ inputBufferStruct* readValues(inputBufferStruct *ptr, int counter, int size){
 		tempInputFile=NULL;
 	}
 	return ptr;
+}
+void fileInput(int start, int end, int maxPossible, sub_fo *small_fo){   // we know that the total size of small_fo = totalSortedFiles = ptr size
+	int i=0;
+	for(i=start;i<end;i++){
+		if(maxPossible<=small_fo[i].left){
+			ptr=resizeArray(ptr,i,maxPossible,small_fo[i].filename);
+			ptr = readValues(ptr,i,maxPossible);
+			small_fo[i].offset += maxPossible;
+			small_fo[i].left -= maxPossible;
+		}
+		else if(maxPossible>small_fo[i].left){
+			ptr = resizeArray(ptr,i,small_fo[i].left,small_fo[i].filename);
+			ptr = readValues(ptr,i,small_fo[i].left);
+			small_fo[i].offset = small_fo[i].total;
+			small_fo[i].left = 0;
+		}
+		if(small_fo[i].left==0){             // TODO : Should I remove this condition
+			small_fo[i].available=0;
+		}
+	}
+}
+
+void printPtr(inputBufferStruct *ptr, int total){
+	int i=0,j=0;
+	for(i=0;i<total;i++){
+		printf("Pointer number: %d\n",i);
+		printf("Size of pointer is : %i\n",ptr[i].int_size);
+		printf("Starting Index: %i\n",(ptr[i].int_start));
+		printf("Associated file name is: %s\n",ptr[i].filename);
+		for(j=0;j<ptr[i].int_size;j++)
+		printf("Elements of the integer are: %i\n",ptr[i].integers[j]);
+	}
+
 }
