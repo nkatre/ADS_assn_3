@@ -15,6 +15,7 @@
 #include<stdlib.h>
 #include<string.h>
 #include <limits.h>
+#include <sys/time.h>
 
 #pragma pack(1)
 typedef struct{
@@ -223,6 +224,11 @@ int main(int argc, char *argv[]){
 
 
 	if(mergeType==1){
+
+		// get the start time
+		 struct timeval start;
+		 gettimeofday( &start, NULL );
+
     FILE *inputReader = NULL;
     inputReader=fopen(argv[2],"r+b");
     rewind(inputReader);
@@ -248,14 +254,25 @@ int main(int argc, char *argv[]){
     printPtr(ptr,totalSortedFiles);
 
     writeSortedRuns(0,totalInts,ptr,argv[3]);
-    /*printf("************Small FO******************");
-    print(small_fo);
-    printf("************Pointer******************");
-    printPtr(ptr,totalSortedFiles); */
     readOutputFile(argv[3]);
     garbageCollector(small_fo,ptr,(totalSortedFiles), mergeType);
+    		// get the end time
+     	 	 struct timeval end;
+     	 	 gettimeofday( &end, NULL );
+
+
+     	 	//print the total time to run the program
+     	 	 struct timeval exec_tm;
+     	 	 exec_tm.tv_sec=end.tv_sec-start.tv_sec;
+     	 	 exec_tm.tv_usec=abs(end.tv_usec-start.tv_usec);
+     	 	 printf( "Time: %ld.%06ld", exec_tm.tv_sec, exec_tm.tv_usec );
+     	 	 printf("\n");
 
 	}
+	if(mergeType==2){
+
+	}
+
 	return 0;
 }
 
