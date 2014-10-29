@@ -53,7 +53,7 @@ int outputBuffer[1000]={0};
 int max_inputBufferSize=10;  //change
 int max_outputBufferSize=10;  //change
 
-int superFiles = 7; //change
+int superFiles = 3; //change
 int superRun=0;
 
 
@@ -358,14 +358,26 @@ int main(int argc, char *argv[]){
         	remainingFiles -= maxPossible[i];
 	    }
 	    remainingFiles = 0;*/
-	    print_super(big_fo,0,superFiles);
 	    printPtr(ptr,totalSortedFiles);
         print(small_fo);
-
+        print_super(big_fo,0,superFiles);
 
         free(maxPossible);
         maxPossible=NULL;
         garbageCollector(small_fo,ptr,totalSortedFiles,2);
+
+        // get the end time
+             	 	 struct timeval end;
+             	 	 gettimeofday( &end, NULL );
+
+
+             	 	//print the total time to run the program
+             	 	 struct timeval exec_tm;
+             	 	 exec_tm.tv_sec=end.tv_sec-start.tv_sec;
+             	 	 exec_tm.tv_usec=abs(end.tv_usec-start.tv_usec);
+             	 	 printf( "Time: %ld.%06ld", exec_tm.tv_sec, exec_tm.tv_usec );
+             	 	 printf("\n");
+
 	}
 
 	return 0;
