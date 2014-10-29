@@ -79,6 +79,7 @@ sub_fo* register_sub_fo(sub_fo *small_fo, int counter, char file[], int offset, 
 		small_fo = (sub_fo *)malloc(sizeof(sub_fo));
 		small_fo[counter].available = 1;
 		strncpy(small_fo[counter].filename,file,strlen(file));
+		//strncpy(small_fo[counter].filename,file,_countof(small_fo[counter].filename) - 1);
 		small_fo[counter].filename[strlen(file)] = '\0';
 		small_fo[counter].offset = offset;
 		small_fo[counter].total = total;
@@ -144,8 +145,10 @@ void createSortedRuns(int start, int end, char file[]){
 	givenFile=fopen(file,"r+b");
 	rewind(givenFile);
 	int i=0;
-
-	char *temp = (char *)malloc(sizeof(char));
+    /*printf("File:%s\n",file);
+    printf("File Length:%zu\n",strlen(file));*/
+	//char *temp = (char *)malloc(sizeof(char)*(strlen(file)+5));
+    char temp[50]={0};
 
 	for(i=start; i<end; i++){
 		fseek(givenFile,0,SEEK_CUR);
@@ -160,17 +163,22 @@ void createSortedRuns(int start, int end, char file[]){
 			// write to file
 
 			strncpy(temp,file,strlen(file));
-			temp[strlen(file)] = '\0';
+
 			//int k=0;
 			char counter[4]={0};
 			/*for(k=0;k<4;k++){
 				counter[k]=0;
 			}*/
 
-			snprintf(counter,5, ".%03d", totalSortedFiles);
-			//sprintf(counter,".%03d",totalSortedFiles);
-			counter[strlen(counter)] = '\0';
-			strncat(temp,counter,4);
+
+			int written = snprintf(counter,5, ".%03d", totalSortedFiles);
+			//printf("Written: %i\n",written);
+			counter[sizeof(counter)] = '\0';
+			/*printf("Temp: %s\n",temp);
+			printf("Counter: %s\n",counter);
+			printf("Written: %i\n",written);*/
+			strncat(temp,counter,written);
+
 
 			FILE *int_File = NULL;
 			int_File=fopen(temp,"w+b");
@@ -205,8 +213,8 @@ void createSortedRuns(int start, int end, char file[]){
 	fclose(givenFile);
 	givenFile=NULL;
 
-	free(temp);
-	temp=NULL;
+/*	free(temp);
+	temp=NULL;*/
 
 
 } // func_end
@@ -254,6 +262,10 @@ int main(int argc, char *argv[]){
     printPtr(ptr,totalSortedFiles);
 
     writeSortedRuns(0,totalInts,ptr,argv[3]);
+    printf("************Small FO******************");
+         print(small_fo);
+       printf("************Pointer******************");
+       printPtr(ptr,totalSortedFiles);
     readOutputFile(argv[3]);
     garbageCollector(small_fo,ptr,(totalSortedFiles), mergeType);
     		// get the end time
@@ -281,6 +293,12 @@ void garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mer
 	if(mergeType == 1){   // --basic
     free(small_fo);
     small_fo=NULL;
+
+    int i=0;
+    for(i=0;i<totalSortedFiles;i++){
+    	free(ptr[i].integers);
+    	ptr[i].integers=NULL;
+    }
     free(ptr);
     ptr=NULL;
 	}
@@ -412,7 +430,9 @@ int findMinElementSequentialSearch(inputBufferStruct *ptr, int size){
     int i=0;
     for(i=0;i<size;i++){
     	int startIndex = ptr[i].int_start;
-    	if((ptr[i].integers[startIndex]<=minElement) && (ptr[i].available==1) && (checkOverflow(ptr,i)==0)){
+    	if((ptr[i].integers[startIndex]<=minElement) &&
+    			(ptr[i].available==1) &&
+    			(checkOverflow(ptr,i)==0)){
     		minElement=ptr[i].integers[startIndex];
     		minElementStructIndex = i;
     	}
