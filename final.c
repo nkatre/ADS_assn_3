@@ -50,8 +50,11 @@ super_fo *big_fo = NULL;
 int totalSortedFiles=0;
 int inputBuffer[1000]={0};
 int outputBuffer[1000]={0};
-int max_inputBufferSize=1000;  //change
-int max_outputBufferSize=1000;  //change
+int max_inputBufferSize=10;  //change
+int max_outputBufferSize=10;  //change
+
+int superFiles = 7; //change
+int superRun=0;
 
 
 int act_outputBufferSize=0;
@@ -62,17 +65,20 @@ int mergeType=0;  //mergeType
 int totalBytes=0;
 int totalInts = 0;
 
+
 void garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mergeType);
 inputBufferStruct* resizeArray(inputBufferStruct *ptr, int counter,int size, char file[]);
 inputBufferStruct* readValues(inputBufferStruct *ptr, int counter, int size);
 void fileInput(int start, int end, int maxPossible, sub_fo *small_fo);
 void printPtr(inputBufferStruct *ptr, int total);
 void writeSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]);
-int findMinElementSequentialSearch(inputBufferStruct *ptr, int size);
+int findMinElementSequentialSearch(inputBufferStruct *ptr,int start,int size);
 int checkOverflow(inputBufferStruct *ptr, int counter);
 inputBufferStruct* readNewInputsFromFile(inputBufferStruct *ptr, int counter);
 sub_fo* modify_small_fo_Values(sub_fo *small_fo,int counter, int diff);
 void readOutputFile(char file[]);
+void createSuperSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]);
+
 
 sub_fo* register_sub_fo(sub_fo *small_fo, int counter, char file[], int offset, int total, int left){
 	if(small_fo==NULL){
@@ -97,7 +103,7 @@ sub_fo* register_sub_fo(sub_fo *small_fo, int counter, char file[], int offset, 
 	return small_fo;
 }
 
-/*
+
 
 super_fo* register_super_fo(super_fo *big_fo, int counter, char file[], int offset, int total, int left){
 	if(big_fo==NULL){
@@ -120,9 +126,8 @@ super_fo* register_super_fo(super_fo *big_fo, int counter, char file[], int offs
 	}
 	return big_fo;
 }
-*/
 
-//void fileInput()
+
 
 int compare (const void * a, const void * b)
 {
@@ -136,6 +141,17 @@ void print(sub_fo *small_fo){
 	printf("Left : %i\n",small_fo[i].left);
 	printf("Total : %i\n",small_fo[i].total);
 	printf("Available : %i\n",small_fo[i].available);
+	}
+}
+
+void print_super(super_fo *big_fo,int start, int end){
+	int i=0;
+	for(i=start;i<end;i++){
+	printf("FileName : %s\n",big_fo[i].filename);
+	printf("Offset : %i\n",big_fo[i].offset);
+	printf("Left : %i\n",big_fo[i].left);
+	printf("Total : %i\n",big_fo[i].total);
+	printf("Available : %i\n",big_fo[i].available);
 	}
 }
 
@@ -249,24 +265,28 @@ int main(int argc, char *argv[]){
     fclose(inputReader);
     inputReader=NULL;
 
-    createSortedRuns(0,totalInts,argv[2]);
+    createSortedRuns(0,totalInts,argv[2]);     // small_fo info  and totalSorteFiles is achieved
+/*
     printf("************Before File Input Call - Small FO******************");
     print(small_fo);
+*/
 
     // get max possible input from each file
     int maxPossible = max_inputBufferSize/totalSortedFiles;
     fileInput(0,totalSortedFiles,maxPossible,small_fo);
-    printf("************After File Input Call - Small FO******************");
+/*    printf("************After File Input Call - Small FO******************");
       print(small_fo);
     printf("************After File Input Call - Pointer******************");
-    printPtr(ptr,totalSortedFiles);
+    printPtr(ptr,totalSortedFiles);*/
 
     writeSortedRuns(0,totalInts,ptr,argv[3]);
-    printf("************Small FO******************");
+/*    printf("************Small FO******************");
          print(small_fo);
        printf("************Pointer******************");
-       printPtr(ptr,totalSortedFiles);
+       printPtr(ptr,totalSortedFiles);*/
+
     readOutputFile(argv[3]);
+
     garbageCollector(small_fo,ptr,(totalSortedFiles), mergeType);
     		// get the end time
      	 	 struct timeval end;
@@ -282,7 +302,70 @@ int main(int argc, char *argv[]){
 
 	}
 	if(mergeType==2){
+		// get the start time
+			 struct timeval start;
+			 gettimeofday( &start, NULL );
 
+	    FILE *inputReader = NULL;
+	    inputReader=fopen(argv[2],"r+b");
+	    rewind(inputReader);
+
+	    // get total integers
+	    fseek(inputReader,0,SEEK_END);
+	    totalBytes = ftell(inputReader);
+	    totalInts = totalBytes/sizeof(int);
+
+	    fclose(inputReader);
+	    inputReader=NULL;
+
+	    createSortedRuns(0,totalInts,argv[2]);  // small_fo info  and totalSorteFiles is achieved
+
+	    printf("************Before File Input Call - Small FO******************");
+	    print(small_fo);
+
+	    //int maxPossible = (max_inputBufferSize/superFiles) + (max_inputBufferSize%superFiles);
+
+	    int *maxPossible = (int *)malloc(sizeof(int)*superFiles);
+	    int i=0;
+
+	    for(i=0;i<superFiles;i++){
+	    	maxPossible[i]=totalSortedFiles/superFiles;
+	    }
+	    for(i=0;i<(totalSortedFiles%superFiles);i++){
+	    	maxPossible[i]+=1;
+	    }
+
+	    int startIndex = 0;
+	    int endIndex = 0;
+
+	    for(i=0;i<superFiles;i++){
+	    	startIndex=endIndex;
+	    	endIndex += maxPossible[i];
+	    	fileInput(startIndex,endIndex,maxPossible[i],small_fo);  // initializes ptr
+	    	createSuperSortedRuns(startIndex,endIndex,ptr,argv[2]);
+	    }
+
+
+/*	    int remainingFiles = totalSortedFiles;
+	    for(i=0;i<totalSortedFiles;i=i+maxPossible[i]){
+	    	startIndex = i;
+	    	if(remainingFiles >= maxPossible[i])
+	    		endIndex = startIndex+maxPossible[i];
+	    	else
+	    		endIndex = totalSortedFiles;
+	    	fileInput(startIndex,endIndex,maxPossible[i],small_fo);  // initializes ptr
+            createSuperSortedRuns(startIndex,endIndex,ptr,argv[2]);
+        	remainingFiles -= maxPossible[i];
+	    }
+	    remainingFiles = 0;*/
+	    print_super(big_fo,0,superFiles);
+	    printPtr(ptr,totalSortedFiles);
+        print(small_fo);
+
+
+        free(maxPossible);
+        maxPossible=NULL;
+        garbageCollector(small_fo,ptr,totalSortedFiles,2);
 	}
 
 	return 0;
@@ -295,13 +378,31 @@ void garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mer
     small_fo=NULL;
 
     int i=0;
-    for(i=0;i<totalSortedFiles;i++){
+    for(i=0;i<size;i++){
     	free(ptr[i].integers);
     	ptr[i].integers=NULL;
     }
     free(ptr);
     ptr=NULL;
 	}
+
+
+	if(mergeType == 2){   // --basic
+	    free(small_fo);
+	    small_fo=NULL;
+
+	    free(big_fo);
+	    big_fo=NULL;
+
+	    int i=0;
+	    for(i=0;i<size;i++){
+	    	free(ptr[i].integers);
+	    	ptr[i].integers=NULL;
+	    }
+	    free(ptr);
+	    ptr=NULL;
+		}
+
 }
 
 inputBufferStruct* resizeArray(inputBufferStruct *ptr, int counter,int size, char file[]){
@@ -385,7 +486,7 @@ void printPtr(inputBufferStruct *ptr, int total){
 		printf("Available: %i\n",ptr[i].available);
 	}
 }
-void writeSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]){
+void writeSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]){    // here the end is totalInts for mergeType==1
 
 	FILE *outFile = NULL;
 	//printf("%s\n",file);
@@ -393,9 +494,12 @@ void writeSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]){
 	rewind(outFile);
 	int i=0;
 	int offset_OB = 0;
-
+	int minElement =0;
 	for(i=start;i<end;i++){
-		int minElement = findMinElementSequentialSearch(ptr,totalSortedFiles);
+		if(mergeType==1)
+			minElement = findMinElementSequentialSearch(ptr,start,totalSortedFiles);
+		/*if(mergeType==2)                                                             // changes for mergeType == 2
+			minElement = findMinElementSequentialSearch(ptr,start,end);   // this end would be replaced*/
 		outputBuffer[act_outputBufferSize] = minElement;
 		act_outputBufferSize++;
 
@@ -423,12 +527,12 @@ void writeSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]){
 	outFile=NULL;
 }
 
-int findMinElementSequentialSearch(inputBufferStruct *ptr, int size){
+int findMinElementSequentialSearch(inputBufferStruct *ptr,int start,int size){    // changes for mergeType == 2 , added start
 
 	int minElement = INT_MAX;
 	int minElementStructIndex = 0;
     int i=0;
-    for(i=0;i<size;i++){
+    for(i=start;i<size;i++){
     	int startIndex = ptr[i].int_start;
     	if((ptr[i].integers[startIndex]<=minElement) &&
     			(ptr[i].available==1) &&
@@ -507,3 +611,85 @@ void readOutputFile(char file[]){
      free(outputInt);
      outputInt=NULL;
 }
+
+void createSuperSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]){    // here the end is totalInts for mergeType==1
+
+	int i=0;
+
+	int totalInts_bet_start_end = 0;
+
+    for(i=start;i<end;i++){
+    	totalInts_bet_start_end += small_fo[i].total;
+    }
+
+    int minElement =0;
+    char temp[100]={0};
+    int offset_super=0;
+	for(i=0;i<totalInts_bet_start_end;i++){
+
+		if(mergeType==2)
+			minElement = findMinElementSequentialSearch(ptr,start,end);
+		outputBuffer[act_outputBufferSize] = minElement;
+		act_outputBufferSize++;
+
+		if((act_outputBufferSize==max_outputBufferSize) ||(i==(totalInts_bet_start_end-1))){
+
+
+			qsort(outputBuffer,act_outputBufferSize,sizeof(int),compare);
+
+						// write to file
+
+						strncpy(temp,file,strlen(file));
+						char counter[4]={0};
+						int written = snprintf(counter,5, ".%03d", superRun);
+						counter[sizeof(counter)] = '\0';
+
+						strncat(temp,".super",6);
+						strncat(temp,counter,written);
+
+
+						FILE *int_File = NULL;
+
+						if((int_File=fopen(temp, "r+b"))==NULL)
+							{
+							int_File = fopen( temp, "w+b" );
+							}
+						rewind(int_File);
+						fseek(int_File,offset_super,SEEK_SET);
+						fwrite(&outputBuffer,sizeof(int),act_outputBufferSize,int_File);
+                        offset_super += (act_outputBufferSize*sizeof(int));
+
+
+						if(totalInts_bet_start_end == (offset_super/sizeof(int))){
+							    // register the sup_fo information
+								big_fo=register_super_fo(big_fo,superRun,temp,0,totalInts_bet_start_end,totalInts_bet_start_end);
+								// increase the total super run files
+								superRun+=1;
+						}
+
+						// Reinitialize
+									int j=0;
+									for(j=0;j<max_outputBufferSize;j++){
+										outputBuffer[j]=0;
+									}
+									act_outputBufferSize=0;
+
+									int len = strlen(temp);
+								    temp[len-10] = '\0';
+					   // Garbage
+									fclose(int_File);
+									int_File = NULL;
+
+
+            /*printf("************Small FO******************Counter: %i\n");
+            print(small_fo);
+            printf("************Pointer******************Counter: %i\n");
+            printPtr(ptr,totalSortedFiles);*/
+
+		}
+	}
+
+
+}
+
+
