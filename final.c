@@ -284,25 +284,25 @@ int main(int argc, char *argv[]){
 
     createSortedRuns(0,totalInts,argv[2]);     // small_fo info  and totalSorteFiles is achieved
 
-    printf("************Before File Input Call - Small FO******************\n");
-    print(small_fo);
+   /* printf("************Before File Input Call - Small FO******************\n");
+    print(small_fo);*/
 
 
     // get max possible input from each file
     int maxPossible = max_inputBufferSize/totalSortedFiles;
     fileInput(0,totalSortedFiles,maxPossible,small_fo);   // ptr initialized
-    printf("************After File Input Call - Small FO******************\n");
+   /* printf("************After File Input Call - Small FO******************\n");
       print(small_fo);
     printf("************After File Input Call - Pointer******************\n");
-    printPtr(ptr,totalSortedFiles);
+    printPtr(ptr,totalSortedFiles);*/
 
     writeSortedRuns(0,totalInts,ptr,argv[3]);
-    printf("************Small FO******************");
+   /* printf("************Small FO******************");
          print(small_fo);
        printf("************Pointer******************");
        printPtr(ptr,totalSortedFiles);
 
-    readOutputFile(argv[3]);
+    readOutputFile(argv[3]);*/
 
     garbageCollector(small_fo,ptr,(totalSortedFiles), mergeType);
     		// get the end time
@@ -337,8 +337,8 @@ int main(int argc, char *argv[]){
 
 	    createSortedRuns(0,totalInts,argv[2]);  // small_fo info  and totalSorteFiles is achieved
 
-	    printf("************Before File Input Call - Small FO******************");
-	    print(small_fo);
+	    /*printf("************Before File Input Call - Small FO******************");
+	    print(small_fo);*/
 
 /*
 
@@ -389,16 +389,16 @@ int main(int argc, char *argv[]){
 	    	remainingFiles -= superFiles;
 	    }
 	    remainingFiles=0;
-	    printPtr(ptr,totalSortedFiles);
+	   /* printPtr(ptr,totalSortedFiles);
         print(small_fo);
-        print_super(big_fo,0,superRun);
+        print_super(big_fo,0,superRun);*/
 
         // get max possible input from each file
         int maxPossible = max_inputBufferSize/superRun;
 
         superFileInput(0,superRun,maxPossible,big_fo);   // superPtr is achieved and big_fo is updated
-        printPtr(superPtr,superRun);
-
+        /*printPtr(superPtr,superRun);
+*/
 
         int j=0;
         for(j=0;j<max_outputBufferSize;j++){
@@ -408,7 +408,9 @@ int main(int argc, char *argv[]){
 
 
         superWriteSortedRuns(0,totalInts,superPtr,argv[3]);
-        readOutputFile(argv[3]);
+
+        /*readOutputFile(argv[3]);*/
+
 
 /*
         // print super files
