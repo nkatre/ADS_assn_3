@@ -56,9 +56,14 @@ int outputBuffer[1000]={0};
 int max_inputBufferSize=1000;  //change
 int max_outputBufferSize=1000;  //change
 
-int superFiles = 15;  // change
-
+int superFiles = 15;  // change    added for --multistep
 int superRun=0;
+
+int currentHeapSize = 750;                  // added for --replacement
+int currentInputBufSize = 250;
+int currentSecHeapSize=0;
+
+
 
 
 int act_outputBufferSize=0;
@@ -95,6 +100,10 @@ super_fo* modify_big_fo_Values(super_fo *big_fo,int counter, int diff);
 inputBufferStruct* superReadValues(inputBufferStruct *superPtr, int counter, int size);
 
 
+// --replacment
+
+char *getRunFileName(char *input, int totalSortedFiles, char *output);
+sub_fo* registerSortedFilesForReplacement(char input[],int totalSortedFiles);
 
 
 sub_fo* register_sub_fo(sub_fo *small_fo, int counter, char file[], int offset, int total, int left){
@@ -444,12 +453,187 @@ int main(int argc, char *argv[]){
 
 	}
 
+	if(mergeType==3){
+
+		// get the start time
+		 struct timeval start;
+		 gettimeofday( &start, NULL );
+
+    FILE *inputReader = NULL;
+    inputReader=fopen(argv[2],"r+b");
+    rewind(inputReader);
+
+    // get total integers
+    fseek(inputReader,0,SEEK_END);
+    totalBytes = ftell(inputReader);
+    totalInts = totalBytes/sizeof(int);
+
+    fclose(inputReader);
+    inputReader=NULL;
+
+    FILE *outputWriter = NULL;
+
+    char temp[100]={0};
+
+    int lastFileSize = 0;
+    int totalSortedNumbers = 0;
+
+
+    inputReader=fopen(argv[2],"r+b");
+    rewind(inputReader);
+
+    lastFileSize = fread(inputBuffer,sizeof(int), 1000, inputReader);
+    if(lastFileSize < 750){
+    	currentInputBufSize = 0;
+    	currentHeapSize = lastFileSize;
+    }
+    else{
+    	currentInputBufSize = lastFileSize - currentHeapSize;
+    }
+
+    totalSortedFiles = 0;
+    getRunFileName(argv[2],totalSortedFiles,temp);
+
+    int *currentInputBufPtr = NULL;
+    int *currentHeapPtr = NULL;
+
+
+    currentInputBufPtr = inputBuffer + currentHeapSize;
+    currentHeapPtr = inputBuffer;
+
+    outputWriter = fopen(temp,"w+b");
+
+    while(1){
+
+    	if(currentHeapSize==0){
+    		break;
+    	}
+
+    	qsort(inputBuffer,currentHeapSize,sizeof(int),compare);
+    	outputBuffer[act_outputBufferSize] = *currentHeapPtr;
+
+    	act_outputBufferSize++;
+    	totalSortedNumbers++;
+    	if((*currentHeapPtr<=*currentInputBufPtr) && (currentInputBufSize > 0)){
+    		*currentHeapPtr = *currentInputBufPtr;
+    		currentInputBufPtr++;
+    		currentInputBufSize--;
+
+    		if(currentInputBufSize==0){
+    			currentInputBufSize = fread(inputBuffer+750,sizeof(int), 250,inputReader);
+    			currentInputBufPtr = inputBuffer + 750;
+    		}
+
+    	}
+    	else{
+    		*currentHeapPtr = *(currentHeapPtr+ currentHeapSize-1);
+    		if(currentInputBufSize>0){
+    			*(currentHeapPtr+currentHeapSize-1)= *currentInputBufPtr;
+    			currentSecHeapSize++;
+    			currentInputBufSize--;
+    			currentInputBufPtr++;
+
+    			if(currentInputBufSize==0){
+    				currentInputBufSize = fread(inputBuffer+750, sizeof(int),250,inputReader);
+    				currentInputBufPtr = inputBuffer+750;
+    			}
+    		}
+
+    		currentHeapSize--;
+    		if(currentHeapSize==0){
+    			if(act_outputBufferSize > 0){
+    				fwrite(outputBuffer,sizeof(int),act_outputBufferSize,outputWriter);
+    				// register the sub_fo information
+    				//small_fo=register_sub_fo(small_fo,totalSortedFiles,temp, 0 ,act_outputBufferSize,act_outputBufferSize);
+    				act_outputBufferSize=0;
+    				int len = strlen(temp);
+    				temp[len-4]='\0';
+
+    			}
+    			fclose(outputWriter);
+    			if(currentSecHeapSize>0){
+    				totalSortedFiles++;
+    				   getRunFileName(argv[2],totalSortedFiles,temp);
+    				outputWriter = fopen(temp,"w+b");
+    				currentHeapSize = currentSecHeapSize;
+    				if(currentHeapSize<750)
+    					memmove(inputBuffer,inputBuffer+750-currentSecHeapSize,currentSecHeapSize*sizeof(int));
+    				currentSecHeapSize=0;
+    			}
+    		}
+    	}
+    	if(act_outputBufferSize==1000){
+    		fwrite(outputBuffer,sizeof(int),act_outputBufferSize,outputWriter);
+    		// register the sub_fo information
+    		//small_fo=register_sub_fo(small_fo,totalSortedFiles,temp, 0 ,act_outputBufferSize,act_outputBufferSize);
+    		act_outputBufferSize=0;
+    		int len = strlen(temp);
+    	    temp[len-4]='\0';
+    	}
+
+    }
+
+
+    if(act_outputBufferSize>0){
+    	fwrite(outputBuffer,sizeof(int),act_outputBufferSize,outputWriter);
+    	// register the sub_fo information
+    	//small_fo=register_sub_fo(small_fo,totalSortedFiles,temp, 0 ,act_outputBufferSize,act_outputBufferSize);
+    	fclose(outputWriter);
+    	int len = strlen(temp);
+        temp[len-4]='\0';
+    }
+
+
+   fclose(inputReader);
+   inputReader=NULL;
+
+   int i=0;
+   for(i=0;i<max_outputBufferSize;i++){
+	   outputBuffer[i]=0;
+   }
+   act_outputBufferSize=0;
+
+  /* printf("%i\n",totalSortedFiles);
+   printf("%i\n",totalSortedNumbers);*/
+   totalSortedFiles +=1;
+   // register small_fo information
+   small_fo = registerSortedFilesForReplacement(argv[2],totalSortedFiles);
+
+    int maxPossible = max_outputBufferSize/totalSortedFiles;
+    fileInput(0,totalSortedFiles,maxPossible,small_fo);   // ptr initialized
+  /* printf("************After File Input Call - Small FO******************\n");
+      print(small_fo);
+    printf("************After File Input Call - Pointer******************\n");
+    printPtr(ptr,totalSortedFiles);
+*/
+    writeSortedRuns(0,totalInts,ptr,argv[3]);
+   /* printf("************Small FO******************");
+         print(small_fo);
+       printf("************Pointer******************");
+       printPtr(ptr,totalSortedFiles);
+
+    readOutputFile(argv[3]);*/
+
+    garbageCollector(small_fo,ptr,totalSortedFiles, mergeType);
+    		// get the end time
+     	 	 struct timeval end;
+     	 	 gettimeofday( &end, NULL );
+
+
+     	 	//print the total time to run the program
+     	 	 struct timeval exec_tm;
+     	 	 exec_tm.tv_sec=end.tv_sec-start.tv_sec;
+     	 	 exec_tm.tv_usec=abs(end.tv_usec-start.tv_usec);
+     	 	 printf( "Time: %ld.%06ld", exec_tm.tv_sec, exec_tm.tv_usec );
+     	 	 printf("\n");
+
+	}
 	return 0;
 }
 
 void garbageCollector(sub_fo *small_fo, inputBufferStruct *ptr,int size, int mergeType){
 
-	if(mergeType == 1){   // --basic
+	if((mergeType == 1)||(mergeType == 3)){   // --basic
     free(small_fo);
     small_fo=NULL;
 
@@ -580,7 +764,7 @@ void writeSortedRuns(int start, int end, inputBufferStruct *ptr, char file[]){  
 	int offset_OB = 0;
 	int minElement =0;
 	for(i=start;i<end;i++){
-		if(mergeType==1)
+		if((mergeType==1) || (mergeType==3))
 			minElement = findMinElementSequentialSearch(ptr,start,totalSortedFiles);
 		if(mergeType==2)                                                             // changes for mergeType == 2
 			minElement = findMinElementSequentialSearch(ptr,start,superRun);   // this end would be replaced*/
@@ -929,4 +1113,47 @@ inputBufferStruct* superReadValues(inputBufferStruct *superPtr, int counter, int
 	}
 
 	return superPtr;
+}
+
+char *getRunFileName(char *input, int totalSortedFiles, char *output){
+
+	strncpy(output,input,strlen(input));
+	output[strlen(input)]='\0';
+	char counter[4]={0};
+				/*for(k=0;k<4;k++){
+					counter[k]=0;
+				}*/
+
+
+				int written = snprintf(counter,5, ".%03d", totalSortedFiles);
+				//printf("Written: %i\n",written);
+				counter[sizeof(counter)] = '\0';
+				/*printf("Temp: %s\n",temp);
+				printf("Counter: %s\n",counter);
+				printf("Written: %i\n",written);*/
+				strncat(output,counter,written);
+
+				return output;
+}
+sub_fo* registerSortedFilesForReplacement(char input[],int totalSortedFiles){
+	char temp[100]={0};
+	int i=0;
+	FILE *tempPtr=NULL;
+	int bytes=0;
+	int Ints =0;
+	int len=0;
+	for(i=0;i<totalSortedFiles;i++){
+		getRunFileName(input,i,temp);
+		tempPtr = fopen(temp,"rb");
+		rewind(tempPtr);
+		fseek(tempPtr,0,SEEK_END);
+		bytes = ftell(tempPtr);
+		Ints = bytes/sizeof(int);
+		small_fo = register_sub_fo(small_fo,i,temp,0,Ints,Ints);
+		len = strlen(temp);
+		temp[len-4]='\0';
+		fclose(tempPtr);
+		tempPtr=NULL;
+	}
+	return small_fo;
 }
